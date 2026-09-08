@@ -144,6 +144,9 @@ describe('redirect and password routes', () => {
     const html = await get.text()
     expect(get.status).toBe(200)
     expect(html).not.toContain('destination.example')
+    expect(get.headers.get('content-security-policy')).toContain("form-action 'self' http: https:;")
+    expect(get.headers.get('content-security-policy')).toContain("base-uri 'none'; frame-ancestors 'none'")
+    expect(html).toContain('action="/demo1"')
     expect(state.increments).toBe(0)
 
     const wrong = await unlockLink(new Request('https://short.example/demo1', {

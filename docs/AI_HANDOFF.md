@@ -122,3 +122,7 @@ consume_rate_limit(p_key text, p_limit integer, p_window_seconds integer)
 ## 完了条件
 
 `npm test`、`npm run typecheck`、`npm run build`を実施し、担当の変更点と実施結果を報告してください。DBモックでの成功とSupabase実接続での成功は区別してください。Vercel環境でのDB権限、同時加算、レート制限の確認は統合担当が行います。
+
+## 2026-09-09 セキュリティ補足
+
+レート制限のclient-ipは、VERCEL=1の場合にVercelが付与するx-vercel-forwarded-forだけを使用し、IP表記を正規化します。その他の環境・ヘッダー欠落・不正値ではunknownの共通バケットを使用します。直接公開サーバーでVERCEL=1を手動設定しないでください。DB関数の引数・返却値は変更していません。調査結果と未確認事項はSECURITY_REVIEW.mdを参照してください。

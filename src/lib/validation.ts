@@ -53,7 +53,7 @@ export function validateOriginalUrl(value: unknown): string {
   if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || !parsed.hostname) {
     throw new ApiError(400, 'INVALID_REQUEST', 'original_url must be a valid HTTP or HTTPS URL without credentials.')
   }
-  const normalizedHost = parsed.hostname.toLowerCase()
+  const normalizedHost = parsed.hostname.toLowerCase().replace(/\.$/, '')
   if (normalizedHost === 'localhost' || normalizedHost.endsWith('.localhost') || normalizedHost.endsWith('.local') || normalizedHost === 'local') {
     throw new ApiError(400, 'INVALID_REQUEST', 'Private and local destinations are not allowed.')
   }
@@ -99,12 +99,14 @@ export function parsePassword(value: unknown): string | null {
 }
 
 export function requestIp(request: Request): string {
-  const raw = (request.headers.get('x-vercel-forwarded-for') ?? request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'))?.split(',')[0]?.trim()
+  // Only Vercel's trusted ingress may supply the client identity.
+  // Direct/local deployments share a bucket instead of trusting caller headers.
+  if (process.env.VERCEL !== '1') return 'unknown'
+  const raw = request.headers.get('x-vercel-forwarded-for')?.trim()
   const candidate = raw?.replace(/^\[|\]$/g, '')
   if (!candidate || candidate.length > 128) return 'unknown'
   try {
-    ipaddr.parse(candidate)
-    return candidate
+    return ipaddr.process(candidate).toString()
   } catch {
     return 'unknown'
   }
