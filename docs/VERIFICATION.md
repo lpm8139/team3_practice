@@ -39,6 +39,16 @@ GitHub連携（`lpm8139/team3_practice`、`main`ブランチ）でVercelにイ�
 
 テスト用に作成したリンク（`OvvaL9LI`ほか）は後始末が必要（未実施の場合は次の担当が削除）。
 
+## バグ修正：パスワード認証後の外部リダイレクトがCSPでブロックされる（担当C・2026-09-08）
+
+本番環境でパスワード保護リンクを開くと、正しいパスワードを入力しても画面が反応しない（ボタン・Enterどちらも無反応）という報告があった。
+
+**原因**: [`src/app/[short_code]/route.ts`](src/app/%5Bshort_code%5D/route.ts)のパスワード入力フォームに設定していたCSPが`form-action 'self'`だった。パスワード認証成功後は必ず`original_url`（任意の外部サイト）へ302リダイレクトする仕様のため、`form-action 'self'`だとブラウザがそのリダイレクト自体をブロックしてしまう。サーバー側の認証・`click_count`加算処理は正常に行われていたため、DB上は成功しているのに画面上は何も起きないように見えていた（curlでは`form-action`はブラウザのみが強制するため再現しなかった）。
+
+**修正**: `form-action 'self'` → `form-action *`（このページの目的が任意の外部URLへの遷移であるため）。ブラウザのDevTools Issuesパネルで`Content Security Policy blocks some resources / directive: form-action`と表示されるのが決め手になった。
+
+`main`にも直接反映し、Vercel Productionへ再デプロイ済み。修正後、ユーザー側のブラウザで実際にパスワード認証→リダイレクトの成功を確認済み。
+
 ## 実施済み（ローカルPostgreSQL互換環境・以前の確認分）
 
 | 確認 | 結果 |
