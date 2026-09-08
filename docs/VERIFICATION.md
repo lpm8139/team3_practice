@@ -6,7 +6,7 @@
 
 | 確認 | 結果 |
 | --- | --- |
-| `npm test` | 21件成功。ローカルPostgreSQL互換環境でマイグレーション、20並列の原子的加算、期限切れ、レート制限、anon/authenticated権限拒否を確認。入力・パスワード・API契約も確認 |
+| `npm test` | 31件成功。ローカルPostgreSQL互換環境でマイグレーション、20並列の原子的加算、期限切れ、レート制限、anon/authenticated権限拒否を確認。入力・パスワード・API契約も確認 |
 | `npm run typecheck` | 成功 |
 | `npm run build` | Next.js 16の本番ビルド成功。トップ、`/{short_code}`、`/api/links`を生成 |
 | `npm start` | 本番サーバー起動、トップ200とブランド表示を確認。環境変数未設定時の作成APIは503・統一JSON・no-storeを確認 |

@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   link: null as Record<string, unknown> | null,
   incremented: null as Record<string, unknown> | null,
   increments: 0,
+  insertedValues: null as Record<string, unknown> | null,
 }))
 
 vi.mock('@/lib/config', () => ({
@@ -22,6 +23,7 @@ vi.mock('@/lib/db', () => ({
   getAdminClient: () => ({
     from: () => ({
       insert: (values: Record<string, unknown>) => ({
+        ...(() => { state.insertedValues = values; return {} })(),
         select: () => ({
           single: async () => ({
             data: state.inserted ? { ...state.inserted, ...values } : null,
@@ -49,6 +51,7 @@ describe('create-link API', () => {
     state.inserted = { original_url: 'https://example.com/', expires_at: null, click_count: 0, title: 'Example', description: null, preview_image_url: null, site_name: 'Example', favicon_url: null }
     state.insertError = null
     state.increments = 0
+    state.insertedValues = null
   })
 
   it('creates a custom link using snake_case and the unified response', async () => {
@@ -61,6 +64,39 @@ describe('create-link API', () => {
       short_code: 'demo1', short_url: 'https://short.example/demo1', original_url: 'https://example.com/', expires_at: null, click_count: '0',
       preview: { title: 'Example', description: null, image_url: null, site_name: 'Example', favicon_url: null },
     })
+    expect(state.insertedValues).toMatchObject({ is_custom_code: true, preview_image_url: null })
+  })
+
+  it.each([
+    ['missing content type', new Headers(), 415],
+    ['invalid json', new Headers({ 'content-type': 'application/json' }), 400],
+  ])('rejects %s at the request boundary', async (_name, headers, status) => {
+    const response = await createLink(new Request('https://short.example/api/links', {
+      method: 'POST', headers,
+      body: headers.get('content-type') ? '{"original_url":' : undefined,
+    }))
+    expect(response.status).toBe(status)
+    expect(await response.json()).toMatchObject({ error: { code: expect.any(String), message: expect.any(String) } })
+  })
+
+  it.each([
+    [{ original_url: 'https://example.com/', custom_code: 'abc' }, 'INVALID_REQUEST'],
+    [{ original_url: 'https://example.com/', expires_at: '2020-01-01T00:00:00Z' }, 'INVALID_REQUEST'],
+    [{ original_url: 'https://example.com/', password: 'short' }, 'INVALID_REQUEST'],
+  ])('rejects invalid field boundaries', async (body, code) => {
+    const response = await createLink(new Request('https://short.example/api/links', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+    }))
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ error: { code } })
+  })
+
+  it('rejects a streamed body above the 64 KiB limit', async () => {
+    const response = await createLink(new Request('https://short.example/api/links', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: 'x'.repeat(64 * 1024 + 1),
+    }))
+    expect(response.status).toBe(413)
+    expect(await response.json()).toMatchObject({ error: { code: 'TOO_LARGE' } })
   })
 
   it('returns 409 for a duplicate custom code', async () => {
@@ -80,6 +116,14 @@ describe('redirect and password routes', () => {
     state.link = { id: 'id', short_code: 'demo1', original_url: 'https://destination.example/path', expires_at: null, password_hash: null, click_count: 0, title: null, description: null, preview_image_url: null, site_name: null, favicon_url: null }
     state.incremented = { ...state.link, click_count: 1 }
     state.increments = 0
+  })
+
+  it('returns 410 for an expired link without incrementing it', async () => {
+    state.link = { ...state.link!, expires_at: '2020-01-01T00:00:00.000Z' }
+    const response = await openLink(new Request('https://short.example/demo1'), context)
+    expect(response.status).toBe(410)
+    expect(await response.json()).toMatchObject({ error: { code: 'EXPIRED' } })
+    expect(state.increments).toBe(0)
   })
 
   it('uses 302 and increments only GET', async () => {
@@ -113,5 +157,18 @@ describe('redirect and password routes', () => {
     }), context)
     expect(correct.status).toBe(302)
     expect(state.increments).toBe(1)
+  })
+
+  it('rejects unsupported and malformed authentication bodies', async () => {
+    state.link = { ...state.link!, password_hash: 'scrypt$test' }
+    const unsupported = await unlockLink(new Request('https://short.example/demo1', {
+      method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'correct-password',
+    }), context)
+    expect(unsupported.status).toBe(415)
+    const malformed = await unlockLink(new Request('https://short.example/demo1', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{',
+    }), context)
+    expect(malformed.status).toBe(400)
+    expect(state.increments).toBe(0)
   })
 })

@@ -99,8 +99,15 @@ export function parsePassword(value: unknown): string | null {
 }
 
 export function requestIp(request: Request): string {
-  const forwarded = (request.headers.get('x-vercel-forwarded-for') ?? request.headers.get('x-forwarded-for'))?.split(',')[0]?.trim()
-  return forwarded || request.headers.get('x-real-ip')?.trim() || 'unknown'
+  const raw = (request.headers.get('x-vercel-forwarded-for') ?? request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip'))?.split(',')[0]?.trim()
+  const candidate = raw?.replace(/^\[|\]$/g, '')
+  if (!candidate || candidate.length > 128) return 'unknown'
+  try {
+    ipaddr.parse(candidate)
+    return candidate
+  } catch {
+    return 'unknown'
+  }
 }
 
 export async function readLimitedText(request: Request, maxBytes: number): Promise<string> {

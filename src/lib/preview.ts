@@ -22,16 +22,19 @@ type ResolvedHost = { address: string; family: 4 | 6 }
 
 async function resolvePublic(hostname: string, timeoutMs: number): Promise<ResolvedHost[]> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const lookup = dns.lookup(hostname, { all: true, verbatim: true })
-  const answers = await Promise.race([
-    lookup,
-    new Promise<Awaited<typeof lookup>>((_, reject) => { timer = setTimeout(() => reject(new Error('DNS timeout')), timeoutMs) }),
-  ])
-  if (timer) clearTimeout(timer)
-  const checkedAnswers = answers
-    .filter((answer): answer is { address: string; family: 4 | 6 } => (answer.family === 4 || answer.family === 6) && isPublicIp(answer.address))
-  if (!answers.length || checkedAnswers.length !== answers.length) throw new Error('Destination has a non-public address')
-  return checkedAnswers
+  try {
+    const lookup = dns.lookup(hostname, { all: true, verbatim: true })
+    const answers = await Promise.race([
+      lookup,
+      new Promise<Awaited<typeof lookup>>((_, reject) => { timer = setTimeout(() => reject(new Error('DNS timeout')), timeoutMs) }),
+    ])
+    const checkedAnswers = answers
+      .filter((answer): answer is { address: string; family: 4 | 6 } => (answer.family === 4 || answer.family === 6) && isPublicIp(answer.address))
+    if (!answers.length || checkedAnswers.length !== answers.length) throw new Error('Destination has a non-public address')
+    return checkedAnswers
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 function cleanText(value: string | undefined | null, max = 500): string | null {
@@ -44,7 +47,8 @@ function absoluteHttpUrl(value: string | undefined, base: URL): string | null {
   try {
     const url = new URL(value, base)
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return null
-    return url.toString()
+    const serialized = url.toString()
+    return serialized.length <= 2048 ? serialized : null
   } catch {
     return null
   }

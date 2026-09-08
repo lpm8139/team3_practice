@@ -84,6 +84,31 @@ HTTPステータスと安定した `code` を処理の判断に使い、`message
 
 RLSと権限設定により匿名クライアントから読み書きできないようにします。サーバー専用キーはAPIの内部だけで使用します。アクセス数はSQL関数で原子的に増やします。認証失敗、入力画面表示、期限切れでは加算しません。
 
+## C担当とのDB関数契約
+
+バックエンドはSupabaseのservice_roleクライアントから、次の2つのRPCだけを呼び出します。引数名と返却形は変更前にB・Cで合意してください。
+
+### `increment_link_click`
+
+```text
+increment_link_click(p_short_code text)
+  returns table (id uuid, short_code text, original_url text,
+    expires_at timestamptz, password_hash text, click_count bigint,
+    title text, description text, preview_image_url text,
+    site_name text, favicon_url text)
+```
+
+`p_short_code`はAPIで検証済みのshort codeです。DB側で、対象が存在し、`expires_at is null or expires_at > now()`の場合だけ1加算して、その1行を返します。対象なし・期限切れは空の集合です。返却列は`id`, `short_code`, `original_url`, `expires_at`, `password_hash`, `click_count`, `title`, `description`, `preview_image_url`, `site_name`, `favicon_url`です。HEAD、パスワード入力画面、認証失敗では呼び出しません。
+
+### `consume_rate_limit`
+
+```text
+consume_rate_limit(p_key text, p_limit integer, p_window_seconds integer)
+  returns boolean
+```
+
+同じ`p_key`の固定ウィンドウ内で、許可された呼び出しなら`true`、上限到達後は`false`を返します。新しいウィンドウではカウントを1に戻します。APIは`false`を429へ変換します。キーは作成系が`create:<client-ip>`、認証系が`auth:<client-ip>`です。両RPCともanon/authenticated/publicには実行権限を与えず、service_roleだけに許可します。
+
 ## 安全性の維持
 
 - URLはhttp/httpsだけを許可し、認証情報入りURLや内部宛先を拒否します。
