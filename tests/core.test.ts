@@ -5,14 +5,18 @@ import {
   parseCustomCode,
   parseExpiresAt,
   parsePassword,
+  requestIp,
   readLimitedText,
   validateOriginalUrl,
 } from '@/lib/validation'
 import { getConfig } from '@/lib/config'
+import { fetchPreview } from '@/lib/preview'
 
 describe('input validation', () => {
   it.each([
     'http://localhost/',
+    'http://localhost./',
+    'https://internal.local./',
     'https://127.0.0.1/admin',
     'https://[::1]/',
     'ftp://example.com/file',
@@ -39,6 +43,17 @@ describe('input validation', () => {
   it('enforces streamed byte limits even without Content-Length', async () => {
     const request = new Request('http://local.test', { method: 'POST', body: 'あいうえお' })
     await expect(readLimitedText(request, 10)).rejects.toMatchObject({ status: 413, code: 'TOO_LARGE' })
+  })
+
+  it('does not fetch loopback preview destinations', async () => {
+    await expect(fetchPreview('http://127.0.0.1:9/')).resolves.toBeNull()
+    await expect(fetchPreview('http://localhost:9/')).resolves.toBeNull()
+  })
+
+  it('normalizes only IP-shaped proxy headers for rate-limit keys', () => {
+    expect(requestIp(new Request('http://local.test', { headers: { 'x-forwarded-for': '203.0.113.8, 10.0.0.2' } }))).toBe('unknown')
+    expect(requestIp(new Request('http://local.test', { headers: { 'x-forwarded-for': 'not-an-ip' } }))).toBe('unknown')
+    expect(requestIp(new Request('http://local.test', { headers: { 'x-forwarded-for': 'x'.repeat(129) } }))).toBe('unknown')
   })
 })
 

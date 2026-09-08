@@ -17,7 +17,9 @@
 | `npm run build` | 実環境変数下でも成功 |
 | テスト用データ | `MKo8EnJJ` / `c-setup-dup` を作成後、削除して後始末済み |
 
-`npm test`（21件）は引き続きPGlite（インメモリのローカルPostgreSQL互換環境）上で実行されるロジック検証であり、今回のSupabase実接続確認とは別物です。誤解のないよう記載を残します。
+
+`npm test`（31件）は引き続きPGlite（インメモリのローカルPostgreSQL互換環境）上で実行されるロジック検証であり、今回のSupabase実接続確認とは別物です。誤解のないよう記載を残します。
+
 
 ### 今回未確認（次の担当・次回セッションへの引き継ぎ）
 
@@ -39,21 +41,12 @@ GitHub連携（`lpm8139/team3_practice`、`main`ブランチ）でVercelにイ�
 
 テスト用に作成したリンク（`OvvaL9LI`ほか）は後始末が必要（未実施の場合は次の担当が削除）。
 
-## バグ修正：パスワード認証後の外部リダイレクトがCSPでブロックされる（担当C・2026-09-08）
-
-本番環境でパスワード保護リンクを開くと、正しいパスワードを入力しても画面が反応しない（ボタン・Enterどちらも無反応）という報告があった。
-
-**原因**: [`src/app/[short_code]/route.ts`](src/app/%5Bshort_code%5D/route.ts)のパスワード入力フォームに設定していたCSPが`form-action 'self'`だった。パスワード認証成功後は必ず`original_url`（任意の外部サイト）へ302リダイレクトする仕様のため、`form-action 'self'`だとブラウザがそのリダイレクト自体をブロックしてしまう。サーバー側の認証・`click_count`加算処理は正常に行われていたため、DB上は成功しているのに画面上は何も起きないように見えていた（curlでは`form-action`はブラウザのみが強制するため再現しなかった）。
-
-**修正**: `form-action 'self'` → `form-action *`（このページの目的が任意の外部URLへの遷移であるため）。ブラウザのDevTools Issuesパネルで`Content Security Policy blocks some resources / directive: form-action`と表示されるのが決め手になった。
-
-`main`にも直接反映し、Vercel Productionへ再デプロイ済み。修正後、ユーザー側のブラウザで実際にパスワード認証→リダイレクトの成功を確認済み。
-
+n
 ## 実施済み（ローカルPostgreSQL互換環境・以前の確認分）
 
 | 確認 | 結果 |
 | --- | --- |
-| `npm test` | 21件成功。ローカルPostgreSQL互換環境でマイグレーション、20並列の原子的加算、期限切れ、レート制限、anon/authenticated権限拒否を確認。入力・パスワード・API契約も確認 |
+| `npm test` | 31件成功。ローカルPostgreSQL互換環境でマイグレーション、20並列の原子的加算、期限切れ、レート制限、anon/authenticated権限拒否を確認。入力・パスワード・API契約も確認 |
 | `npm run typecheck` | 成功 |
 | `npm run build` | Next.js 16の本番ビルド成功。トップ、`/{short_code}`、`/api/links`を生成 |
 | `npm start` | 本番サーバー起動、トップ200とブランド表示を確認。環境変数未設定時の作成APIは503・統一JSON・no-storeを確認 |
@@ -63,7 +56,8 @@ GitHub連携（`lpm8139/team3_practice`、`main`ブランチ）でVercelにイ�
 
 ## 実環境で必要な確認（残項目）
 
-開発用SupabaseへのSQL適用と基本動作（作成・リダイレクト・click_count・重複409）は2026-09-08に確認済みです（上記セクション参照）。残るのはVercelへの公開デプロイと、`TEAM_WORKFLOW.md`の統合表のうち未確認項目（匿名キー拒否の実環境確認、Vercelが付与する転送元IPヘッダーを前提とするレート制限、期限切れ・パスワード系フローの実DB個別確認、同時リダイレクト）です。
+開発用SupabaseへのSQL適用と基本動作（作成・リダイレクト・click_count・重複409）は2026-09-08に確認済みです（上記セクション参照）。残るのは`TEAM_WORKFLOW.md`の統合表のうち未確認項目（匿名キー拒否の実環境確認、Vercelが付与する転送元IPヘッダーを前提とするレート制限、期限切れ・パスワード系フローの実DB個別確認、同時リダイレクト）です。
+
 
 ## セキュリティ確認範囲
 
