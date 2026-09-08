@@ -33,7 +33,9 @@ async function load(client: NonNullable<ReturnType<typeof getAdminClient>>, code
 function passwordForm(code: string): NextResponse {
   const escapedCode = code.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const html = `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>パスワードが必要です</title><style>body{margin:0;background:#f7f4ed;color:#173c3b;font-family:system-ui,sans-serif}main{max-width:28rem;margin:12vh auto;padding:2rem;background:#fffdf8;border:1px solid #d9e4dd;border-radius:12px}label,input,button{display:block;width:100%;box-sizing:border-box}input{margin:.6rem 0 1rem;padding:.8rem;border:1px solid #bdd3c9;border-radius:7px}button{padding:.8rem;border:0;border-radius:7px;background:#1d7770;color:white}</style></head><body><main><h1>パスワードが必要です</h1><p>この短縮リンクは保護されています。</p><form method="post" action="/${escapedCode}"><label>パスワード<input type="password" name="password" maxlength="128" required autocomplete="current-password"></label><button type="submit">リンクを開く</button></form></main></body></html>`
-  return new NextResponse(html, { status: 200, headers: noStoreHeaders({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http: https:; base-uri 'none'; frame-ancestors 'none'" }) })
+
+  return new NextResponse(html, { status: 200, headers: noStoreHeaders({ 'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action *; base-uri 'none'; frame-ancestors 'none'" }) })
+
 }
 
 function redirectResponse(destination: string): NextResponse {
